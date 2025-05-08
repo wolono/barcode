@@ -100,7 +100,7 @@ export default function Home() {
           setError('未找到匹配的商品');
         }
       }
-    } catch (_) {
+    } catch {
       setError('查询失败，请稍后重试');
       setProducts([]);
     } finally {
@@ -164,7 +164,7 @@ export default function Home() {
           searchProducts();
         }
       }
-    } catch (_) {
+    } catch {
       setError('添加失败，请稍后重试');
     } finally {
       setIsLoading(false);
@@ -219,7 +219,7 @@ export default function Home() {
           searchProducts();
         }
       }
-    } catch (_) {
+    } catch {
       setError('更新失败，请稍后重试');
     } finally {
       setIsLoading(false);
@@ -388,7 +388,7 @@ export default function Home() {
                     searchProducts();
                   }
                 }
-              } catch (_) {
+              } catch {
                 setError('添加失败，请稍后重试');
               } finally {
                 setIsLoading(false);

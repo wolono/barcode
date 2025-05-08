@@ -111,7 +111,7 @@ const BatchImportForm = ({ onImport, onCancel }: BatchImportFormProps) => {
       }
       
       onImport(products);
-    } catch (_) {
+    } catch {
       setError('解析数据时出错，请检查格式是否正确');
     }
   };
