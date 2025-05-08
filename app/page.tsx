@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import JsBarcode from 'jsbarcode';
 import BatchImportForm from './components/BatchImportForm';
 
@@ -9,11 +8,11 @@ import BatchImportForm from './components/BatchImportForm';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
+
 
 // 产品类型定义
 interface Product {
@@ -101,7 +100,7 @@ export default function Home() {
           setError('未找到匹配的商品');
         }
       }
-    } catch (err) {
+    } catch (_) {
       setError('查询失败，请稍后重试');
       setProducts([]);
     } finally {
@@ -165,7 +164,7 @@ export default function Home() {
           searchProducts();
         }
       }
-    } catch (err) {
+    } catch (_) {
       setError('添加失败，请稍后重试');
     } finally {
       setIsLoading(false);
@@ -220,7 +219,7 @@ export default function Home() {
           searchProducts();
         }
       }
-    } catch (err) {
+    } catch (_) {
       setError('更新失败，请稍后重试');
     } finally {
       setIsLoading(false);
@@ -389,7 +388,7 @@ export default function Home() {
                     searchProducts();
                   }
                 }
-              } catch (err) {
+              } catch (_) {
                 setError('添加失败，请稍后重试');
               } finally {
                 setIsLoading(false);

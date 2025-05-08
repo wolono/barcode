@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       const products = getAllProducts();
       return NextResponse.json({ products });
     }
-  } catch (error) {
+  } catch (_) {
     return NextResponse.json({ error: '获取产品数据失败' }, { status: 500 });
   }
 }
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     
     const addedProducts = addProducts(products);
     return NextResponse.json({ success: true, products: addedProducts });
-  } catch (error) {
+  } catch (_) {
     return NextResponse.json({ error: '添加产品失败' }, { status: 500 });
   }
 }
@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest) {
     
     const updatedProducts = updateProducts(products);
     return NextResponse.json({ success: true, products: updatedProducts });
-  } catch (error) {
+  } catch (_) {
     return NextResponse.json({ error: '更新产品失败' }, { status: 500 });
   }
 }
