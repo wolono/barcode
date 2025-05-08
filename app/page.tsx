@@ -5,6 +5,16 @@ import Image from 'next/image';
 import JsBarcode from 'jsbarcode';
 import BatchImportForm from './components/BatchImportForm';
 
+// 引入shadcn组件
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
+
 // 产品类型定义
 interface Product {
   itemID: string;
@@ -288,7 +298,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen p-6 bg-gray-50">
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold mb-2">预售上架系统</h1>
         <p className="text-gray-600">根据商品itemID匹配数据库生成条形码与库位条形码</p>
@@ -296,49 +306,60 @@ export default function Home() {
       
       <main className="max-w-6xl mx-auto">
         {/* 批量查询区域 */}
-        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4">批量查询</h2>
-          <div className="flex flex-col md:flex-row gap-4">
-            <textarea 
-              className="flex-grow p-2 border rounded-md" 
-              placeholder="输入商品ID，多个ID请用逗号或空格分隔" 
-              value={searchIds}
-              onChange={(e) => setSearchIds(e.target.value)}
-              rows={3}
-            />
-            <div className="flex flex-col gap-2">
-              <button 
-                className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"
-                onClick={searchProducts}
-                disabled={isLoading}
-              >
-                {isLoading ? '查询中...' : '查询'}
-              </button>
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>批量查询</CardTitle>
+            <CardDescription>输入商品ID进行批量查询，多个ID请用逗号或空格分隔</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4">
+              <Textarea 
+                className="flex-grow" 
+                placeholder="输入商品ID，多个ID请用逗号或空格分隔" 
+                value={searchIds}
+                onChange={(e) => setSearchIds(e.target.value)}
+                rows={3}
+              />
               <div className="flex flex-col gap-2">
-                <button 
-                  className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition-colors"
-                  onClick={() => {
-                    setShowAddForm(!showAddForm);
-                    if (!showAddForm) setShowBatchImport(false);
-                  }}
+                <Button 
+                  variant="default"
+                  onClick={searchProducts}
+                  disabled={isLoading}
                 >
-                  {showAddForm ? '取消添加' : '添加商品'}
-                </button>
-                <button 
-                  className="bg-purple-500 text-white py-2 px-4 rounded-md hover:bg-purple-600 transition-colors"
-                  onClick={() => {
-                    setShowBatchImport(!showBatchImport);
-                    if (!showBatchImport) setShowAddForm(false);
-                  }}
-                >
-                  {showBatchImport ? '取消批量导入' : '批量导入'}
-                </button>
+                  {isLoading ? '查询中...' : '查询'}
+                </Button>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant={showAddForm ? "outline" : "secondary"}
+                    onClick={() => {
+                      setShowAddForm(!showAddForm);
+                      if (!showAddForm) setShowBatchImport(false);
+                    }}
+                  >
+                    {showAddForm ? '取消添加' : '添加商品'}
+                  </Button>
+                  <Button 
+                    variant={showBatchImport ? "outline" : "secondary"}
+                    onClick={() => {
+                      setShowBatchImport(!showBatchImport);
+                      if (!showBatchImport) setShowAddForm(false);
+                    }}
+                  >
+                    {showBatchImport ? '取消批量导入' : '批量导入'}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-          
-          {error && <p className="text-red-500 mt-2">{error}</p>}
-        </div>
+          </CardContent>
+          <CardFooter>
+            {error && (
+              <Alert variant="destructive" className="w-full">
+                <AlertTitle>错误</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </CardFooter>
+        </Card>
         
         {/* 批量导入商品表单 */}
         {showBatchImport && (
@@ -380,190 +401,196 @@ export default function Home() {
         
         {/* 添加商品表单 */}
         {showAddForm && (
-          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 className="text-xl font-semibold mb-4">添加商品</h2>
-            {newProducts.map((product, index) => (
-              <div key={index} className="p-4 border rounded-md mb-4 bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">商品ID</label>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 border rounded-md" 
-                      value={product.itemID}
-                      onChange={(e) => updateNewProduct(index, 'itemID', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">商品UPC</label>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 border rounded-md" 
-                      value={product.upc}
-                      onChange={(e) => updateNewProduct(index, 'upc', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">商品名称</label>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 border rounded-md" 
-                      value={product.name}
-                      onChange={(e) => updateNewProduct(index, 'name', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">商品库位</label>
-                    <input 
-                      type="text" 
-                      className="w-full p-2 border rounded-md" 
-                      value={product.location}
-                      onChange={(e) => updateNewProduct(index, 'location', e.target.value)}
-                    />
-                  </div>
-                </div>
-                <button 
-                  className="text-red-500 text-sm"
-                  onClick={() => removeNewProduct(index)}
-                  disabled={newProducts.length === 1}
-                >
-                  移除
-                </button>
-              </div>
-            ))}
-            <div className="flex justify-between">
-              <button 
-                className="bg-gray-200 py-1 px-3 rounded-md hover:bg-gray-300 transition-colors"
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>添加商品</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {newProducts.map((product, index) => (
+                <Card key={index} className="mb-4 bg-gray-50">
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">商品ID</label>
+                        <Input 
+                          type="text" 
+                          value={product.itemID}
+                          onChange={(e) => updateNewProduct(index, 'itemID', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">商品UPC</label>
+                        <Input 
+                          type="text" 
+                          value={product.upc}
+                          onChange={(e) => updateNewProduct(index, 'upc', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">商品名称</label>
+                        <Input 
+                          type="text" 
+                          value={product.name}
+                          onChange={(e) => updateNewProduct(index, 'name', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">商品库位</label>
+                        <Input 
+                          type="text" 
+                          value={product.location}
+                          onChange={(e) => updateNewProduct(index, 'location', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost"
+                      className="text-red-500 mt-2 p-0 h-auto"
+                      onClick={() => removeNewProduct(index)}
+                      disabled={newProducts.length === 1}
+                    >
+                      移除
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline"
                 onClick={addNewProductForm}
               >
                 + 添加更多
-              </button>
-              <button 
-                className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition-colors"
+              </Button>
+              <Button 
+                variant="default"
                 onClick={submitNewProducts}
                 disabled={isLoading}
               >
                 {isLoading ? '提交中...' : '提交'}
-              </button>
-            </div>
-          </div>
+              </Button>
+            </CardFooter>
+          </Card>
         )}
         
         {/* 编辑商品表单 */}
         {showEditForm && editingProduct && (
-          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 className="text-xl font-semibold mb-4">编辑商品</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">商品ID</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border rounded-md bg-gray-100" 
-                  value={editingProduct.itemID}
-                  readOnly
-                />
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>编辑商品</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">商品ID</label>
+                  <Input 
+                    type="text" 
+                    className="bg-gray-100" 
+                    value={editingProduct.itemID}
+                    readOnly
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">商品UPC</label>
+                  <Input 
+                    type="text" 
+                    value={editingProduct.upc}
+                    onChange={(e) => updateEditingProduct('upc', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">商品名称</label>
+                  <Input 
+                    type="text" 
+                    value={editingProduct.name}
+                    onChange={(e) => updateEditingProduct('name', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">商品库位</label>
+                  <Input 
+                    type="text" 
+                    value={editingProduct.location}
+                    onChange={(e) => updateEditingProduct('location', e.target.value)}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">商品UPC</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border rounded-md" 
-                  value={editingProduct.upc}
-                  onChange={(e) => updateEditingProduct('upc', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">商品名称</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border rounded-md" 
-                  value={editingProduct.name}
-                  onChange={(e) => updateEditingProduct('name', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">商品库位</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border rounded-md" 
-                  value={editingProduct.location}
-                  onChange={(e) => updateEditingProduct('location', e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button 
-                className="bg-gray-200 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+              <Button 
+                variant="outline"
                 onClick={() => setShowEditForm(false)}
               >
                 取消
-              </button>
-              <button 
-                className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"
+              </Button>
+              <Button 
+                variant="default"
                 onClick={submitEditProduct}
                 disabled={isLoading}
               >
                 {isLoading ? '保存中...' : '保存'}
-              </button>
-            </div>
-          </div>
+              </Button>
+            </CardFooter>
+          </Card>
         )}
         
         {/* 查询结果与条形码展示 */}
         {products.length > 0 && (
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">查询结果 ({products.length})</h2>
-              <button 
-                className="bg-purple-500 text-white py-2 px-4 rounded-md hover:bg-purple-600 transition-colors"
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>查询结果 ({products.length})</CardTitle>
+              <Button 
+                variant="secondary"
                 onClick={printBarcodes}
               >
                 打印条形码
-              </button>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-2 text-left border">商品ID</th>
-                    <th className="p-2 text-left border">商品名称</th>
-                    <th className="p-2 text-left border">商品条形码</th>
-                    <th className="p-2 text-left border">库位条形码</th>
-                    <th className="p-2 text-left border">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product, index) => (
-                    <tr key={product.itemID} className="border-b hover:bg-gray-50">
-                      <td className="p-2 border">{product.itemID}</td>
-                      <td className="p-2 border">{product.name}</td>
-                      <td className="p-2 border">
-                        <canvas 
-                          ref={(el) => { barcodeRefs.current[index] = el; }} 
-                          className="max-w-full"
-                        />
-                      </td>
-                      <td className="p-2 border">
-                        <canvas 
-                          ref={(el) => { locationBarcodeRefs.current[index] = el; }} 
-                          className="max-w-full"
-                        />
-                      </td>
-                      <td className="p-2 border">
-                        <button 
-                          className="text-blue-500 hover:underline"
-                          onClick={() => startEdit(product)}
-                        >
-                          编辑
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>商品ID</TableHead>
+                      <TableHead>商品名称</TableHead>
+                      <TableHead>商品条形码</TableHead>
+                      <TableHead>库位条形码</TableHead>
+                      <TableHead>操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((product, index) => (
+                      <TableRow key={product.itemID}>
+                        <TableCell>{product.itemID}</TableCell>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell>
+                          <canvas 
+                            ref={(el) => { barcodeRefs.current[index] = el; }} 
+                            className="max-w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <canvas 
+                            ref={(el) => { locationBarcodeRefs.current[index] = el; }} 
+                            className="max-w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="link"
+                            className="p-0 h-auto"
+                            onClick={() => startEdit(product)}
+                          >
+                            编辑
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </main>
     </div>

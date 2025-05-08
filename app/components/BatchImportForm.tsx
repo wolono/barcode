@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { Product } from '@/lib/db';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface BatchImportFormProps {
   onImport: (products: Product[]) => void;
@@ -22,14 +29,16 @@ const BatchImportForm = ({ onImport, onCancel }: BatchImportFormProps) => {
     
     try {
       let products: Product[] = [];
+      // 将lines变量提升到更高作用域，使其在整个函数中可访问
+      const lines = importText.trim().split('\n');
+      let hasHeader = false;
       
       if (importType === 'csv') {
         // 处理CSV格式
-        const lines = importText.trim().split('\n');
-        
+        // 检查是否有标题行
+        hasHeader = lines[0].includes('itemID') || lines[0].includes('商品ID');
         // 跳过可能的标题行
-        const startIndex = lines[0].includes('itemID') || 
-                          lines[0].includes('商品ID') ? 1 : 0;
+        const startIndex = hasHeader ? 1 : 0;
         
         for (let i = startIndex; i < lines.length; i++) {
           const line = lines[i].trim();
@@ -50,8 +59,6 @@ const BatchImportForm = ({ onImport, onCancel }: BatchImportFormProps) => {
         }
       } else {
         // 处理文本格式 (每行一个商品，字段用制表符或多个空格分隔)
-        const lines = importText.trim().split('\n');
-        
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
@@ -78,20 +85,24 @@ const BatchImportForm = ({ onImport, onCancel }: BatchImportFormProps) => {
       }
       
       // 验证所有必填字段
+      // 定义一个类型来明确指定invalidProducts中的元素类型
+      type InvalidProduct = { index: number; missingFields: string[] };
+      
       const invalidProducts = products.map((p, index) => {
-        const missingFields = [];
+        const missingFields: string[] = [];
         if (!p.itemID) missingFields.push('商品ID');
         if (!p.upc) missingFields.push('UPC');
         if (!p.name) missingFields.push('商品名称');
         if (!p.location) missingFields.push('库位');
         
         return missingFields.length > 0 ? { index, missingFields } : null;
-      }).filter(Boolean);
+      }).filter(Boolean) as InvalidProduct[];
       
       if (invalidProducts.length > 0) {
         const errorDetails = invalidProducts.map(item => {
+          // 现在TypeScript知道item不可能为null
           const lineNumber = importType === 'csv' ? 
-            (lines[0].includes('itemID') || lines[0].includes('商品ID') ? item.index + 2 : item.index + 1) : 
+            (hasHeader ? item.index + 2 : item.index + 1) : 
             item.index + 1;
           return `第${lineNumber}行缺少: ${item.missingFields.join(', ')}`;
         }).join('\n');
@@ -107,72 +118,76 @@ const BatchImportForm = ({ onImport, onCancel }: BatchImportFormProps) => {
   };
   
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-      <h2 className="text-xl font-semibold mb-4">批量导入商品</h2>
+    <Card className="mb-8">
+      <CardHeader>
+        <CardTitle>批量导入商品</CardTitle>
+        <CardDescription>
+          请选择导入格式并粘贴商品数据
+        </CardDescription>
+      </CardHeader>
       
-      <div className="mb-4">
-        <div className="flex space-x-4 mb-2">
-          <label className="inline-flex items-center">
-            <input
-              type="radio"
-              className="form-radio"
-              name="importType"
-              checked={importType === 'text'}
-              onChange={() => setImportType('text')}
-            />
-            <span className="ml-2">文本格式 (每行一个商品，字段用制表符或多个空格分隔)</span>
-          </label>
-          <label className="inline-flex items-center">
-            <input
-              type="radio"
-              className="form-radio"
-              name="importType"
-              checked={importType === 'csv'}
-              onChange={() => setImportType('csv')}
-            />
-            <span className="ml-2">CSV格式 (每行一个商品，字段用逗号分隔)</span>
-          </label>
+      <CardContent>
+        <div className="space-y-4">
+          <RadioGroup 
+            defaultValue={importType} 
+            onValueChange={(value) => setImportType(value as 'csv' | 'text')}
+            className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="text" id="text" />
+              <Label htmlFor="text">文本格式 (每行一个商品，字段用制表符或多个空格分隔)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="csv" id="csv" />
+              <Label htmlFor="csv">CSV格式 (每行一个商品，字段用逗号分隔)</Label>
+            </div>
+          </RadioGroup>
+          
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>
+              {importType === 'csv' 
+                ? '格式: 商品ID,UPC,商品名称,库位' 
+                : '格式: 商品ID    UPC    商品名称    库位'}
+            </p>
+            <p>示例: {importType === 'csv' 
+              ? 'A001,123456789012,测试商品1,A-01-01' 
+              : 'A001    123456789012    测试商品1    A-01-01'}</p>
+          </div>
+          
+          <Textarea
+            className="font-mono"
+            rows={10}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder={importType === 'csv' 
+              ? '商品ID,UPC,商品名称,库位\nA001,123456789012,测试商品1,A-01-01' 
+              : '商品ID    UPC    商品名称    库位\nA001    123456789012    测试商品1    A-01-01'}
+          />
         </div>
         
-        <div className="mb-2">
-          <p className="text-sm text-gray-600 mb-1">
-            {importType === 'csv' 
-              ? '格式: 商品ID,UPC,商品名称,库位' 
-              : '格式: 商品ID    UPC    商品名称    库位'}
-          </p>
-          <p className="text-sm text-gray-600">示例: {importType === 'csv' 
-            ? 'A001,123456789012,测试商品1,A-01-01' 
-            : 'A001    123456789012    测试商品1    A-01-01'}</p>
-        </div>
-        
-        <textarea
-          className="w-full p-2 border rounded-md font-mono"
-          rows={10}
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-          placeholder={importType === 'csv' 
-            ? '商品ID,UPC,商品名称,库位\nA001,123456789012,测试商品1,A-01-01' 
-            : '商品ID    UPC    商品名称    库位\nA001    123456789012    测试商品1    A-01-01'}
-        />
-      </div>
+        {error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>导入错误</AlertTitle>
+            <AlertDescription className="whitespace-pre-wrap">{error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
       
-      {error && <pre className="text-red-500 mb-4 whitespace-pre-wrap">{error}</pre>}
-      
-      <div className="flex justify-end space-x-2">
-        <button
-          className="bg-gray-300 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
+      <CardFooter className="flex justify-end space-x-2">
+        <Button
+          variant="outline"
           onClick={onCancel}
         >
           取消
-        </button>
-        <button
-          className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition-colors"
+        </Button>
+        <Button
+          variant="default"
           onClick={handleImport}
         >
           导入
-        </button>
-      </div>
-    </div>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
