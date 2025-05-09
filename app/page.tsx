@@ -112,10 +112,11 @@ export default function Home() {
             const format = (product.upc.length === 11 || product.upc.length === 12) ? "EAN13" : "CODE128";
             
             JsBarcode(barcodeCanvas, completeUpc, {
+        width: 3,
+        height: 100,
               format: format,
               displayValue: true,
               fontSize: 14,
-              height: 50,
               margin: 10,
               valid: function(valid) {
                 if (!valid) {
@@ -123,10 +124,11 @@ export default function Home() {
                   // 如果EAN13格式失败，回退到CODE128
                   if (format === "EAN13") {
                     JsBarcode(barcodeCanvas, completeUpc, {
+        width: 3,
+        height: 50,
                       format: "CODE128",
                       displayValue: true,
                       fontSize: 14,
-                      height: 50,
                       margin: 10
                     });
                   }
@@ -153,10 +155,11 @@ export default function Home() {
         
         if (locationBarcodeCanvas) {
           JsBarcode(locationBarcodeCanvas, product.location, {
+        width: 3,
+        height: 100,
             format: "CODE128",
             displayValue: true,
             fontSize: 14,
-            height: 50,
             margin: 10
           });
         }
@@ -320,112 +323,7 @@ export default function Home() {
   };
 
   // 打印条形码
-  const printBarcodes = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      setError('无法打开打印窗口，请检查浏览器设置');
-      return;
-    }
-    
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>条形码打印</title>
-          <style>
-            body { font-family: Arial, sans-serif; }
-            .barcode-container { margin: 20px 0; page-break-inside: avoid; }
-            .product-info { margin-bottom: 5px; }
-          </style>
-        </head>
-        <body>
-    `);
-    
-    products.forEach(product => {
-      const barcodeCanvas = document.createElement('canvas');
-      const locationBarcodeCanvas = document.createElement('canvas');
-      
-      // 确保UPC码完整（包含校验位）
-      const completeUpc = (product.upc.length === 12 || product.upc.length === 11) ? calculateCheckDigit(product.upc) : product.upc;
-      
-      try {
-        // 对于11位和12位的UPC码，尝试使用EAN-13格式
-        const format = (product.upc.length === 11 || product.upc.length === 12) ? "EAN13" : "CODE128";
-        
-        JsBarcode(barcodeCanvas, completeUpc, {
-          format: format,
-          displayValue: true,
-          fontSize: 14,
-          height: 50,
-          margin: 10,
-          valid: function(valid) {
-            if (!valid) {
-              console.warn("条形码无效：", product.upc, "补全后：", completeUpc, "格式：", format);
-              // 如果EAN13格式失败，回退到CODE128
-              if (format === "EAN13") {
-                JsBarcode(barcodeCanvas, completeUpc, {
-                  format: "CODE128",
-                  displayValue: true,
-                  fontSize: 14,
-                  height: 50,
-                  margin: 10
-                });
-              }
-            }
-            return true; // 即使无效也尝试渲染
-          }
-        });
-      } catch (error) {
-        console.error("生成条形码出错：", error, "UPC:", product.upc);
-        // 出错时回退到CODE128格式
-        try {
-          JsBarcode(barcodeCanvas, product.upc, {
-            format: "CODE128",
-            displayValue: true,
-            fontSize: 14,
-            height: 50,
-            margin: 10
-          });
-        } catch (e) {
-          console.error("回退到CODE128也失败：", e);
-        }
-      }
-      
-      JsBarcode(locationBarcodeCanvas, product.location, {
-        format: "CODE128",
-        displayValue: true,
-        fontSize: 14,
-        height: 50,
-        margin: 10
-      });
-      
-      printWindow.document.write(`
-        <div class="barcode-container">
-          <div class="product-info">
-            <strong>商品ID:</strong> ${product.itemID} | <strong>名称:</strong> ${product.name}
-          </div>
-          <div>
-            <strong>商品条形码:</strong><br>
-            <img src="${barcodeCanvas.toDataURL('image/png')}" />
-          </div>
-          <div>
-            <strong>库位条形码:</strong><br>
-            <img src="${locationBarcodeCanvas.toDataURL('image/png')}" />
-          </div>
-        </div>
-      `);
-    });
-    
-    printWindow.document.write(`
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-  };
+  
 
   return (
     <div className="min-h-screen p-6 bg-gray-50">
@@ -684,9 +582,9 @@ export default function Home() {
               <CardTitle>查询结果 ({products.length})</CardTitle>
               <Button 
                 variant="secondary"
-                onClick={printBarcodes}
+                disabled={true}
               >
-                打印条形码
+                打印条形码(功能暂不可用)
               </Button>
             </CardHeader>
             <CardContent>
@@ -694,11 +592,11 @@ export default function Home() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>商品ID</TableHead>
-                      <TableHead>商品名称</TableHead>
-                      <TableHead>商品条形码</TableHead>
-                      <TableHead>库位条形码</TableHead>
-                      <TableHead>操作</TableHead>
+                      <TableHead className="text-center">商品ID</TableHead>
+                      <TableHead className="text-center">商品名称</TableHead>
+                      <TableHead className="text-center">商品条形码</TableHead>
+                      <TableHead className="text-center">库位条形码</TableHead>
+                      <TableHead className="text-center">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
