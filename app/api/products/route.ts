@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllProducts, getProductsByIds, addProducts, updateProducts, Product } from '@/lib/db';
+import { getAllProducts, getAllProductsWithDuplicateCheck, getProductsByIds, addProducts, updateProducts, Product } from '@/lib/db';
+import { findDuplicateItemIDs, formatDuplicateMessage } from '@/lib/checkDuplicates';
+import { formatNotFoundMessage } from '@/lib/notFoundHelper';
 
 // 获取所有产品或根据ID查询产品
 export async function GET(request: NextRequest) {
@@ -9,13 +11,32 @@ export async function GET(request: NextRequest) {
   try {
     if (ids) {
       const idArray = ids.split(',');
-      const products = getProductsByIds(idArray);
-      return NextResponse.json({ products });
+      const result = getProductsByIds(idArray);
+      const notFoundInfo = result.notFoundIds.length > 0 ? {
+        hasNotFound: true,
+        notFoundCount: result.notFoundIds.length,
+        notFoundIds: result.notFoundIds
+      } : null;
+      
+      return NextResponse.json({
+        products: result.products,
+        notFoundInfo: notFoundInfo,
+        notFoundMessage: formatNotFoundMessage(notFoundInfo)
+      });
     } else {
-      const products = getAllProducts();
-      return NextResponse.json({ products });
+      // 使用带有重复检测的函数
+      const result = getAllProductsWithDuplicateCheck();
+      return NextResponse.json({
+        products: result.products,
+        duplicateInfo: result.hasDuplicates ? {
+          hasDuplicates: result.hasDuplicates,
+          duplicateCount: result.duplicateCount,
+          duplicates: result.duplicates,
+          message: formatDuplicateMessage(result)
+        } : null
+      });
     }
-  } catch {
+  } catch (error) {
     return NextResponse.json({ error: '获取产品数据失败' }, { status: 500 });
   }
 }
@@ -41,7 +62,7 @@ export async function POST(request: NextRequest) {
     
     const addedProducts = addProducts(products);
     return NextResponse.json({ success: true, products: addedProducts });
-  } catch {
+  } catch (error) {
     return NextResponse.json({ error: '添加产品失败' }, { status: 500 });
   }
 }
@@ -67,7 +88,7 @@ export async function PUT(request: NextRequest) {
     
     const updatedProducts = updateProducts(products);
     return NextResponse.json({ success: true, products: updatedProducts });
-  } catch {
+  } catch (error) {
     return NextResponse.json({ error: '更新产品失败' }, { status: 500 });
   }
 }

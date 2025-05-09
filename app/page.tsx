@@ -4,6 +4,32 @@ import { useState, useEffect, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
 import BatchImportForm from './components/BatchImportForm';
 
+// 计算EAN-13/UPC-A校验位的函数
+function calculateCheckDigit(barcode: string): string {
+  // 确保输入的是数字
+  const numericCode = barcode.replace(/\D/g, '');
+  
+  // 如果长度不是11位或12位，则返回原始码
+  if (numericCode.length !== 12 && numericCode.length !== 11) {
+    return barcode;
+  }
+  
+  // 对于11位的UPC码，需要补齐到12位再计算校验位
+  const codeForCalculation = numericCode.length === 11 ? '0' + numericCode : numericCode;
+  
+  // 计算校验位 - 修正EAN-13/UPC-A校验位计算
+  // 奇数位(索引为偶数)乘以1，偶数位(索引为奇数)乘以3
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(codeForCalculation[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  
+  const checkDigit = (10 - (sum % 10)) % 10;
+  
+  // 返回带校验位的条形码
+  return codeForCalculation + checkDigit;
+}
+
 // 引入shadcn组件
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +62,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [duplicateInfo, setDuplicateInfo] = useState<{hasDuplicates: boolean; duplicateCount: number; message: string} | null>(null);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [showBatchImport, setShowBatchImport] = useState<boolean>(false);
   const [newProducts, setNewProducts] = useState<Product[]>([emptyProduct]);
@@ -46,6 +73,29 @@ export default function Home() {
   const barcodeRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const locationBarcodeRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
+  // 页面加载时检查重复的itemID
+  useEffect(() => {
+    const checkDuplicates = async () => {
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+        
+        // 处理重复itemID信息
+        if (data.duplicateInfo && data.duplicateInfo.hasDuplicates) {
+          setDuplicateInfo({
+            hasDuplicates: data.duplicateInfo.hasDuplicates,
+            duplicateCount: data.duplicateInfo.duplicateCount,
+            message: data.duplicateInfo.message
+          });
+        }
+      } catch (error) {
+        console.error('检查重复itemID失败:', error);
+      }
+    };
+    
+    checkDuplicates();
+  }, []);
+
   // 生成条形码
   useEffect(() => {
     if (products.length > 0) {
@@ -54,13 +104,51 @@ export default function Home() {
         const locationBarcodeCanvas = locationBarcodeRefs.current[index];
         
         if (barcodeCanvas) {
-          JsBarcode(barcodeCanvas, product.upc, {
-            format: "CODE128",
-            displayValue: true,
-            fontSize: 14,
-            height: 50,
-            margin: 10
-          });
+          // 确保UPC码完整（包含校验位）
+          const completeUpc = (product.upc.length === 12 || product.upc.length === 11) ? calculateCheckDigit(product.upc) : product.upc;
+          
+          try {
+            // 对于11位和12位的UPC码，尝试使用EAN-13格式
+            const format = (product.upc.length === 11 || product.upc.length === 12) ? "EAN13" : "CODE128";
+            
+            JsBarcode(barcodeCanvas, completeUpc, {
+              format: format,
+              displayValue: true,
+              fontSize: 14,
+              height: 50,
+              margin: 10,
+              valid: function(valid) {
+                if (!valid) {
+                  console.warn("条形码无效：", product.upc, "补全后：", completeUpc, "格式：", format);
+                  // 如果EAN13格式失败，回退到CODE128
+                  if (format === "EAN13") {
+                    JsBarcode(barcodeCanvas, completeUpc, {
+                      format: "CODE128",
+                      displayValue: true,
+                      fontSize: 14,
+                      height: 50,
+                      margin: 10
+                    });
+                  }
+                }
+                return true; // 即使无效也尝试渲染
+              }
+            });
+          } catch (error) {
+            console.error("生成条形码出错：", error, "UPC:", product.upc);
+            // 出错时回退到CODE128格式
+            try {
+              JsBarcode(barcodeCanvas, product.upc, {
+                format: "CODE128",
+                displayValue: true,
+                fontSize: 14,
+                height: 50,
+                margin: 10
+              });
+            } catch (e) {
+              console.error("回退到CODE128也失败：", e);
+            }
+          }
         }
         
         if (locationBarcodeCanvas) {
@@ -89,6 +177,7 @@ export default function Home() {
     try {
       const ids = searchIds.split(/[,，\s]+/).filter(id => id.trim());
       const response = await fetch(`/api/products?ids=${ids.join(',')}`);
+      setDuplicateInfo(null);
       const data = await response.json();
       
       if (data.error) {
@@ -96,7 +185,11 @@ export default function Home() {
         setProducts([]);
       } else {
         setProducts(data.products);
-        if (data.products.length === 0) {
+        
+        // 处理未找到的itemID
+        if (data.notFoundMessage) {
+          setError(data.notFoundMessage);
+        } else if (data.products.length === 0) {
           setError('未找到匹配的商品');
         }
       }
@@ -251,13 +344,51 @@ export default function Home() {
       const barcodeCanvas = document.createElement('canvas');
       const locationBarcodeCanvas = document.createElement('canvas');
       
-      JsBarcode(barcodeCanvas, product.upc, {
-        format: "CODE128",
-        displayValue: true,
-        fontSize: 14,
-        height: 50,
-        margin: 10
-      });
+      // 确保UPC码完整（包含校验位）
+      const completeUpc = (product.upc.length === 12 || product.upc.length === 11) ? calculateCheckDigit(product.upc) : product.upc;
+      
+      try {
+        // 对于11位和12位的UPC码，尝试使用EAN-13格式
+        const format = (product.upc.length === 11 || product.upc.length === 12) ? "EAN13" : "CODE128";
+        
+        JsBarcode(barcodeCanvas, completeUpc, {
+          format: format,
+          displayValue: true,
+          fontSize: 14,
+          height: 50,
+          margin: 10,
+          valid: function(valid) {
+            if (!valid) {
+              console.warn("条形码无效：", product.upc, "补全后：", completeUpc, "格式：", format);
+              // 如果EAN13格式失败，回退到CODE128
+              if (format === "EAN13") {
+                JsBarcode(barcodeCanvas, completeUpc, {
+                  format: "CODE128",
+                  displayValue: true,
+                  fontSize: 14,
+                  height: 50,
+                  margin: 10
+                });
+              }
+            }
+            return true; // 即使无效也尝试渲染
+          }
+        });
+      } catch (error) {
+        console.error("生成条形码出错：", error, "UPC:", product.upc);
+        // 出错时回退到CODE128格式
+        try {
+          JsBarcode(barcodeCanvas, product.upc, {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: 14,
+            height: 50,
+            margin: 10
+          });
+        } catch (e) {
+          console.error("回退到CODE128也失败：", e);
+        }
+      }
       
       JsBarcode(locationBarcodeCanvas, product.location, {
         format: "CODE128",
@@ -355,6 +486,19 @@ export default function Home() {
               <Alert variant="destructive" className="w-full">
                 <AlertTitle>错误</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            {duplicateInfo && duplicateInfo.hasDuplicates && (
+              <Alert variant="warning" className="mb-4 bg-yellow-50 border-yellow-200">
+                <AlertTitle>警告：发现重复的商品ID</AlertTitle>
+                <AlertDescription className="whitespace-pre-line">
+                  系统中存在{duplicateInfo.duplicateCount}个重复的商品ID。
+                  <details>
+                    <summary className="cursor-pointer font-medium text-yellow-700 hover:text-yellow-800">点击查看详情</summary>
+                    <div className="mt-2 text-sm">{duplicateInfo.message}</div>
+                  </details>
+                </AlertDescription>
               </Alert>
             )}
           </CardFooter>

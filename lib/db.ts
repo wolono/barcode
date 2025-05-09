@@ -32,10 +32,53 @@ export const getAllProducts = (): Product[] => {
   return JSON.parse(data);
 };
 
-// 根据itemID获取产品
-export const getProductsByIds = (ids: string[]): Product[] => {
+// 获取所有产品并检查重复的itemID
+export const getAllProductsWithDuplicateCheck = () => {
   const products = getAllProducts();
-  return products.filter(product => ids.includes(product.itemID));
+  
+  // 检查重复的itemID
+  const itemIDMap = new Map<string, Product[]>();
+  const duplicates: Record<string, Product[]> = {};
+  
+  products.forEach(product => {
+    if (!product.itemID) return;
+    
+    if (!itemIDMap.has(product.itemID)) {
+      itemIDMap.set(product.itemID, [product]);
+    } else {
+      const existingProducts = itemIDMap.get(product.itemID) || [];
+      itemIDMap.set(product.itemID, [...existingProducts, product]);
+    }
+  });
+  
+  // 找出有多个产品的itemID
+  itemIDMap.forEach((productList, itemID) => {
+    if (productList.length > 1) {
+      duplicates[itemID] = productList;
+    }
+  });
+  
+  return {
+    products,
+    hasDuplicates: Object.keys(duplicates).length > 0,
+    duplicateCount: Object.keys(duplicates).length,
+    duplicates
+  };
+};
+
+// 根据itemID获取产品
+export const getProductsByIds = (ids: string[]): { products: Product[], notFoundIds: string[] } => {
+  const products = getAllProducts();
+  const foundProducts = products.filter(product => ids.includes(product.itemID));
+  
+  // 找出未找到的itemID
+  const foundIds = foundProducts.map(product => product.itemID);
+  const notFoundIds = ids.filter(id => !foundIds.includes(id));
+  
+  return {
+    products: foundProducts,
+    notFoundIds: notFoundIds
+  };
 };
 
 // 添加多个产品
