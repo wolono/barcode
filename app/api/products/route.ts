@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllProducts, getAllProductsWithDuplicateCheck, getProductsByIds, addProducts, updateProducts, Product } from '@/lib/db';
-import { findDuplicateItemIDs, formatDuplicateMessage } from '@/lib/checkDuplicates';
+import { getAllProductsWithDuplicateCheck, getProductsByIds, addProducts, updateProducts, Product } from '@/lib/db';
+import { formatDuplicateMessage } from '@/lib/checkDuplicates';
 import { formatNotFoundMessage } from '@/lib/notFoundHelper';
 
 // 获取所有产品或根据ID查询产品
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         } : null
       });
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '获取产品数据失败' }, { status: 500 });
   }
 }
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     
     const addedProducts = addProducts(products);
     return NextResponse.json({ success: true, products: addedProducts });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '添加产品失败' }, { status: 500 });
   }
 }
@@ -88,7 +88,7 @@ export async function PUT(request: NextRequest) {
     
     const updatedProducts = updateProducts(products);
     return NextResponse.json({ success: true, products: updatedProducts });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '更新产品失败' }, { status: 500 });
   }
 }

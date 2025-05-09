@@ -41,7 +41,7 @@ export const findDuplicateItemIDs = (products: Product[]) => {
  * @param duplicateInfo 重复itemID信息
  * @returns 格式化的提示信息
  */
-export const formatDuplicateMessage = (duplicateInfo: ReturnType<typeof findDuplicateItemIDs> | any) => {
+export const formatDuplicateMessage = (duplicateInfo: ReturnType<typeof findDuplicateItemIDs> | { hasDuplicates: boolean; duplicateCount: number; duplicates: Record<string, Product[]> }) => {
   if (!duplicateInfo || !duplicateInfo.hasDuplicates) {
     return '';
   }
