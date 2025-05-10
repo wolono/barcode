@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import JsBarcode from 'jsbarcode';
-import BatchImportForm from './components/BatchImportForm';
 
 // 计算EAN-13/UPC-A校验位的函数
 function calculateCheckDigit(barcode: string): string {
@@ -63,9 +62,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [duplicateInfo, setDuplicateInfo] = useState<{hasDuplicates: boolean; duplicateCount: number; message: string} | null>(null);
-  const [showAddForm, setShowAddForm] = useState<boolean>(false);
-  const [showBatchImport, setShowBatchImport] = useState<boolean>(false);
-  const [newProducts, setNewProducts] = useState<Product[]>([emptyProduct]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showEditForm, setShowEditForm] = useState<boolean>(false);
   
@@ -204,68 +200,7 @@ export default function Home() {
     }
   };
 
-  // 添加新的空白产品表单
-  const addNewProductForm = () => {
-    setNewProducts([...newProducts, {...emptyProduct}]);
-  };
 
-  // 更新新产品表单数据
-  const updateNewProduct = (index: number, field: keyof Product, value: string) => {
-    const updated = [...newProducts];
-    updated[index] = { ...updated[index], [field]: value };
-    setNewProducts(updated);
-  };
-
-  // 移除新产品表单
-  const removeNewProduct = (index: number) => {
-    const updated = [...newProducts];
-    updated.splice(index, 1);
-    setNewProducts(updated);
-  };
-
-  // 提交新产品
-  const submitNewProducts = async () => {
-    // 验证所有必填字段
-    const isValid = newProducts.every(product => 
-      product.itemID && product.upc && product.name && product.location
-    );
-    
-    if (!isValid) {
-      setError('所有字段都是必填的');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ products: newProducts }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setNewProducts([emptyProduct]);
-        setShowAddForm(false);
-        setError('');
-        // 如果添加成功，刷新产品列表
-        if (searchIds.trim()) {
-          searchProducts();
-        }
-      }
-    } catch {
-      setError('添加失败，请稍后重试');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // 开始编辑产品
   const startEdit = (product: Product) => {
@@ -340,43 +275,22 @@ export default function Home() {
             <CardDescription>输入商品ID进行批量查询，多个ID请用逗号或空格分隔</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col gap-4">
               <Textarea 
-                className="flex-grow" 
+                className="w-full" 
                 placeholder="输入商品ID，多个ID请用逗号或空格分隔" 
                 value={searchIds}
                 onChange={(e) => setSearchIds(e.target.value)}
                 rows={3}
               />
-              <div className="flex flex-col gap-2">
-                <Button 
-                  variant="default"
-                  onClick={searchProducts}
-                  disabled={isLoading}
-                >
-                  {isLoading ? '查询中...' : '查询'}
-                </Button>
-                <div className="flex flex-col gap-2">
-                  <Button 
-                    variant={showAddForm ? "outline" : "secondary"}
-                    onClick={() => {
-                      setShowAddForm(!showAddForm);
-                      if (!showAddForm) setShowBatchImport(false);
-                    }}
-                  >
-                    {showAddForm ? '取消添加' : '添加商品'}
-                  </Button>
-                  <Button 
-                    variant={showBatchImport ? "outline" : "secondary"}
-                    onClick={() => {
-                      setShowBatchImport(!showBatchImport);
-                      if (!showBatchImport) setShowAddForm(false);
-                    }}
-                  >
-                    {showBatchImport ? '取消批量导入' : '批量导入'}
-                  </Button>
-                </div>
-              </div>
+              <Button 
+                variant="default"
+                onClick={searchProducts}
+                disabled={isLoading}
+                className="mx-auto"
+              >
+                {isLoading ? '查询中...' : '查询'}
+              </Button>
             </div>
           </CardContent>
           <CardFooter>
@@ -402,117 +316,7 @@ export default function Home() {
           </CardFooter>
         </Card>
         
-        {/* 批量导入商品表单 */}
-        {showBatchImport && (
-          <BatchImportForm 
-            onImport={async (importedProducts) => {
-              setIsLoading(true);
-              setError('');
-              
-              try {
-                const response = await fetch('/api/products', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ products: importedProducts }),
-                });
-                
-                const data = await response.json();
-                
-                if (data.error) {
-                  setError(data.error);
-                } else {
-                  setShowBatchImport(false);
-                  setError('');
-                  // 如果添加成功，刷新产品列表
-                  if (searchIds.trim()) {
-                    searchProducts();
-                  }
-                }
-              } catch {
-                setError('添加失败，请稍后重试');
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            onCancel={() => setShowBatchImport(false)}
-          />
-        )}
-        
-        {/* 添加商品表单 */}
-        {showAddForm && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>添加商品</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {newProducts.map((product, index) => (
-                <Card key={index} className="mb-4 bg-gray-50">
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">商品ID</label>
-                        <Input 
-                          type="text" 
-                          value={product.itemID}
-                          onChange={(e) => updateNewProduct(index, 'itemID', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">商品UPC</label>
-                        <Input 
-                          type="text" 
-                          value={product.upc}
-                          onChange={(e) => updateNewProduct(index, 'upc', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">商品名称</label>
-                        <Input 
-                          type="text" 
-                          value={product.name}
-                          onChange={(e) => updateNewProduct(index, 'name', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">商品库位</label>
-                        <Input 
-                          type="text" 
-                          value={product.location}
-                          onChange={(e) => updateNewProduct(index, 'location', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost"
-                      className="text-red-500 mt-2 p-0 h-auto"
-                      onClick={() => removeNewProduct(index)}
-                      disabled={newProducts.length === 1}
-                    >
-                      移除
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button 
-                variant="outline"
-                onClick={addNewProductForm}
-              >
-                + 添加更多
-              </Button>
-              <Button 
-                variant="default"
-                onClick={submitNewProducts}
-                disabled={isLoading}
-              >
-                {isLoading ? '提交中...' : '提交'}
-              </Button>
-            </CardFooter>
-          </Card>
-        )}
+
         
         {/* 编辑商品表单 */}
         {showEditForm && editingProduct && (
