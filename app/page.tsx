@@ -31,7 +31,6 @@ function calculateCheckDigit(barcode: string): string {
 
 // 引入shadcn组件
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,13 +46,7 @@ interface Product {
   location: string;
 }
 
-// 空白产品模板
-const emptyProduct: Product = {
-  itemID: '',
-  upc: '',
-  name: '',
-  location: ''
-};
+// Product interface is used for type checking throughout the component
 
 export default function Home() {
   // 状态管理
@@ -62,8 +55,8 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [duplicateInfo, setDuplicateInfo] = useState<{hasDuplicates: boolean; duplicateCount: number; message: string} | null>(null);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [showEditForm, setShowEditForm] = useState<boolean>(false);
+
+  const [closedRows, setClosedRows] = useState<Set<string>>(new Set());
   
   // 条形码引用
   const barcodeRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -94,8 +87,11 @@ export default function Home() {
 
   // 生成条形码
   useEffect(() => {
-    if (products.length > 0) {
-      products.forEach((product, index) => {
+    // 过滤掉已关闭的行
+    const filteredProducts = products.filter(product => !closedRows.has(product.itemID));
+    
+    if (filteredProducts.length > 0) {
+      filteredProducts.forEach((product, index) => {
         const barcodeCanvas = barcodeRefs.current[index];
         const locationBarcodeCanvas = locationBarcodeRefs.current[index];
         
@@ -161,7 +157,7 @@ export default function Home() {
         }
       });
     }
-  }, [products]);
+  }, [products, closedRows]);
 
   // 批量查询产品
   const searchProducts = async () => {
@@ -172,6 +168,8 @@ export default function Home() {
     
     setIsLoading(true);
     setError('');
+    // 重置closedRows状态，确保新查询的结果能够正常显示
+    setClosedRows(new Set());
     
     try {
       const ids = searchIds.split(/[,，\s]+/).filter(id => id.trim());
@@ -202,60 +200,20 @@ export default function Home() {
 
 
 
-  // 开始编辑产品
-  const startEdit = (product: Product) => {
-    setEditingProduct({...product});
-    setShowEditForm(true);
+
+
+  // 关闭行
+  const closeRow = (itemID: string) => {
+    setClosedRows(prev => {
+      const newSet = new Set(prev);
+      newSet.add(itemID);
+      return newSet;
+    });
   };
 
-  // 更新编辑中的产品
-  const updateEditingProduct = (field: keyof Product, value: string) => {
-    if (editingProduct) {
-      setEditingProduct({...editingProduct, [field]: value});
-    }
-  };
 
-  // 提交编辑后的产品
-  const submitEditProduct = async () => {
-    if (!editingProduct) return;
-    
-    // 验证所有必填字段
-    if (!editingProduct.itemID || !editingProduct.upc || !editingProduct.name || !editingProduct.location) {
-      setError('所有字段都是必填的');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch('/api/products', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ product: editingProduct }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setEditingProduct(null);
-        setShowEditForm(false);
-        setError('');
-        // 如果更新成功，刷新产品列表
-        if (searchIds.trim()) {
-          searchProducts();
-        }
-      }
-    } catch {
-      setError('更新失败，请稍后重试');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+
 
   // 打印条形码
   
@@ -318,78 +276,13 @@ export default function Home() {
         
 
         
-        {/* 编辑商品表单 */}
-        {showEditForm && editingProduct && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>编辑商品</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">商品ID</label>
-                  <Input 
-                    type="text" 
-                    className="bg-gray-100" 
-                    value={editingProduct.itemID}
-                    readOnly
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">商品UPC</label>
-                  <Input 
-                    type="text" 
-                    value={editingProduct.upc}
-                    onChange={(e) => updateEditingProduct('upc', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">商品名称</label>
-                  <Input 
-                    type="text" 
-                    value={editingProduct.name}
-                    onChange={(e) => updateEditingProduct('name', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">商品库位</label>
-                  <Input 
-                    type="text" 
-                    value={editingProduct.location}
-                    onChange={(e) => updateEditingProduct('location', e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-              <Button 
-                variant="outline"
-                onClick={() => setShowEditForm(false)}
-              >
-                取消
-              </Button>
-              <Button 
-                variant="default"
-                onClick={submitEditProduct}
-                disabled={isLoading}
-              >
-                {isLoading ? '保存中...' : '保存'}
-              </Button>
-            </CardFooter>
-          </Card>
-        )}
+
         
         {/* 查询结果与条形码展示 */}
         {products.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>查询结果 ({products.length})</CardTitle>
-              <Button 
-                variant="secondary"
-                disabled={true}
-              >
-                打印条形码(功能暂不可用)
-              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -404,7 +297,9 @@ export default function Home() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {products.map((product, index) => (
+                    {products
+                      .filter(product => !closedRows.has(product.itemID))
+                      .map((product, index) => (
                       <TableRow key={product.itemID}>
                         <TableCell>{product.itemID}</TableCell>
                         <TableCell>{product.name}</TableCell>
@@ -420,13 +315,15 @@ export default function Home() {
                             className="max-w-full"
                           />
                         </TableCell>
+
                         <TableCell>
                           <Button 
-                            variant="link"
-                            className="p-0 h-auto"
-                            onClick={() => startEdit(product)}
+                            variant="ghost"
+                            size="sm"
+                            className="p-0 h-auto text-red-500 hover:text-red-700"
+                            onClick={() => closeRow(product.itemID)}
                           >
-                            编辑
+                            关闭
                           </Button>
                         </TableCell>
                       </TableRow>
