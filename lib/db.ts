@@ -1,6 +1,7 @@
 // 数据库操作函数
 import fs from 'fs';
 import path from 'path';
+import * as sqliteDb from './db-sqlite';
 
 // 定义产品类型
 export interface Product {
@@ -12,6 +13,14 @@ export interface Product {
 
 // 数据库文件路径
 const DB_PATH = path.join(process.cwd(), 'data', 'products.json');
+
+// 初始化SQLite数据库
+try {
+  sqliteDb.initDatabase();
+  console.log('SQLite数据库初始化成功');
+} catch (error) {
+  console.error('SQLite数据库初始化失败', error);
+}
 
 // 确保数据库文件存在
 const ensureDbExists = () => {
@@ -99,30 +108,89 @@ export const addProducts = (newProducts: Product[]): Product[] => {
 
 // 更新产品
 export const updateProduct = (updatedProduct: Product): Product | null => {
-  const products = getAllProducts();
-  const index = products.findIndex(p => p.itemID === updatedProduct.itemID);
-  
-  if (index === -1) return null;
-  
-  products[index] = updatedProduct;
-  fs.writeFileSync(DB_PATH, JSON.stringify(products, null, 2), 'utf8');
-  
-  return updatedProduct;
+  try {
+    // 优先使用SQLite数据库
+    return sqliteDb.updateProductInDb(updatedProduct);
+  } catch (error) {
+    // 如果SQLite出错，回退到JSON文件
+    console.error('在SQLite更新数据失败，回退到JSON文件', error);
+    const products = getAllProducts();
+    const index = products.findIndex(p => p.itemID === updatedProduct.itemID);
+    
+    if (index === -1) {
+      return null;
+    }
+    
+    products[index] = updatedProduct;
+    fs.writeFileSync(DB_PATH, JSON.stringify(products, null, 2), 'utf8');
+    
+    return updatedProduct;
+  }
 };
 
 // 批量更新产品
 export const updateProducts = (updatedProducts: Product[]): Product[] => {
-  const products = getAllProducts();
-  const result: Product[] = [];
-  
-  updatedProducts.forEach(updatedProduct => {
-    const index = products.findIndex(p => p.itemID === updatedProduct.itemID);
-    if (index !== -1) {
-      products[index] = updatedProduct;
-      result.push(updatedProduct);
+  try {
+    // 优先使用SQLite数据库
+    return sqliteDb.updateProductsInDb(updatedProducts);
+  } catch (error) {
+    // 如果SQLite出错，回退到JSON文件
+    console.error('在SQLite批量更新数据失败，回退到JSON文件', error);
+    const products = getAllProducts();
+    const result: Product[] = [];
+    
+    updatedProducts.forEach(updatedProduct => {
+      const index = products.findIndex(p => p.itemID === updatedProduct.itemID);
+      if (index !== -1) {
+        products[index] = updatedProduct;
+        result.push(updatedProduct);
+      }
+    });
+    
+    fs.writeFileSync(DB_PATH, JSON.stringify(products, null, 2), 'utf8');
+    return result;
+  }
+};
+
+// 删除产品
+export const deleteProduct = (itemID: string): boolean => {
+  try {
+    // 优先使用SQLite数据库
+    return sqliteDb.deleteProductFromDb(itemID);
+  } catch (error) {
+    // 如果SQLite出错，回退到JSON文件
+    console.error('从SQLite删除数据失败，回退到JSON文件', error);
+    const products = getAllProducts();
+    const initialLength = products.length;
+    
+    const filteredProducts = products.filter(product => product.itemID !== itemID);
+    
+    if (filteredProducts.length === initialLength) {
+      return false;
     }
-  });
-  
-  fs.writeFileSync(DB_PATH, JSON.stringify(products, null, 2), 'utf8');
-  return result;
+    
+    fs.writeFileSync(DB_PATH, JSON.stringify(filteredProducts, null, 2), 'utf8');
+    
+    return true;
+  }
+};
+
+// 从JSON导入数据到SQLite
+export const importFromJsonToSqlite = (): number => {
+  try {
+    return sqliteDb.importProductsFromJson();
+  } catch (error) {
+    console.error('从JSON导入数据到SQLite失败', error);
+    return 0;
+  }
+};
+
+// 从SQLite更新JSON文件
+export const updateJsonFromSqlite = (): number => {
+  try {
+    return sqliteDb.updateJsonFromDb();
+  } catch (error) {
+    console.error('从SQLite更新JSON文件失败', error);
+    return 0;
+  }
 };
