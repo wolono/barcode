@@ -92,18 +92,29 @@ export const getProductsByIds = (ids: string[]): { products: Product[], notFound
 
 // 添加多个产品
 export const addProducts = (newProducts: Product[]): Product[] => {
-  ensureDbExists();
-  const products = getAllProducts();
-  
-  // 过滤掉已存在的产品
-  const filteredNewProducts = newProducts.filter(newProduct => 
-    !products.some(product => product.itemID === newProduct.itemID)
-  );
-  
-  const updatedProducts = [...products, ...filteredNewProducts];
-  fs.writeFileSync(DB_PATH, JSON.stringify(updatedProducts, null, 2), 'utf8');
-  
-  return filteredNewProducts;
+  try {
+    // 优先使用SQLite数据库
+    // sqliteDb.addProductsToDb 会处理已存在产品的过滤，并返回实际添加的产品列表
+    const addedToSqlite = sqliteDb.addProductsToDb(newProducts);
+    // sqliteDb.addProductsToDb 内部在成功添加后会调用 updateJsonFromDb() 来同步JSON文件
+    return addedToSqlite;
+  } catch (error) {
+    // 如果SQLite出错，回退到JSON文件
+    console.error('在SQLite添加数据失败，回退到JSON文件', error);
+    ensureDbExists();
+    const products = getAllProducts(); // 从JSON读取
+    
+    // 过滤掉已存在的产品 (JSON中的)
+    const filteredNewProducts = newProducts.filter(newProduct => 
+      !products.some(product => product.itemID === newProduct.itemID)
+    );
+    
+    if (filteredNewProducts.length > 0) {
+        const updatedProductsList = [...products, ...filteredNewProducts];
+        fs.writeFileSync(DB_PATH, JSON.stringify(updatedProductsList, null, 2), 'utf8'); // 写入JSON
+    }
+    return filteredNewProducts;
+  }
 };
 
 // 更新产品

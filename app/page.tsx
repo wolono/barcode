@@ -34,6 +34,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input"; // 新增 Input 组件
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog"; // 新增 Dialog 组件
+import { Label } from "@/components/ui/label"; // 新增 Label 组件
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -55,8 +58,15 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [duplicateInfo, setDuplicateInfo] = useState<{hasDuplicates: boolean; duplicateCount: number; message: string} | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const [closedRows, setClosedRows] = useState<Set<string>>(new Set());
+
+  // 添加/编辑产品相关的状态
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [formData, setFormData] = useState<Product>({ itemID: '', upc: '', name: '', location: '' });
   
   // 条形码引用
   const barcodeRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -198,9 +208,110 @@ export default function Home() {
     }
   };
 
+  // 处理表单输入变化
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
+  // 打开添加产品模态框
+  const openAddModal = () => {
+    setFormData({ itemID: '', upc: '', name: '', location: '' }); // 重置表单
+    setError('');
+    setSuccessMessage('');
+    setIsAddModalOpen(true);
+  };
 
+  // 打开编辑产品模态框
+  const openEditModal = (product: Product) => {
+    setCurrentProduct(product);
+    setFormData(product);
+    setError('');
+    setSuccessMessage('');
+    setIsEditModalOpen(true);
+  };
 
+  // 添加产品
+  const handleAddProduct = async () => {
+    if (!formData.itemID || !formData.upc || !formData.name || !formData.location) {
+      setError('所有字段均为必填项');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: formData }),
+      });
+      const result = await response.json();
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSuccessMessage('产品添加成功！');
+        setIsAddModalOpen(false);
+        // 可选: 刷新产品列表或将新产品添加到现有列表
+        // searchProducts(); // 如果希望添加后立即看到所有产品（包括重复检查）
+        // 或者，如果API返回了添加的产品，可以直接更新本地状态
+        if (result.products && result.products.length > 0) {
+          // 如果当前没有搜索条件，可以将新产品添加到列表顶部
+          if (!searchIds.trim()) {
+             setProducts(prevProducts => [result.products[0], ...prevProducts]);
+          } else {
+            // 如果有搜索条件，最好重新搜索以保持一致性
+            searchProducts();
+          }
+        }
+        
+      }
+    } catch (err) {
+      setError('添加产品失败，请稍后重试');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 编辑产品
+  const handleEditProduct = async () => {
+    if (!currentProduct || !formData.itemID) {
+      setError('无法编辑产品，缺少产品信息');
+      return;
+    }
+    if (!formData.upc || !formData.name || !formData.location) {
+      setError('UPC, 名称, 和库位均为必填项');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      const response = await fetch('/api/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product: { ...formData, itemID: currentProduct.itemID } }), // 确保itemID是原始的
+      });
+      const result = await response.json();
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSuccessMessage('产品更新成功！');
+        setIsEditModalOpen(false);
+        // 更新本地产品列表
+        setProducts(prevProducts => 
+          prevProducts.map(p => p.itemID === currentProduct.itemID ? { ...formData, itemID: currentProduct.itemID } : p)
+        );
+      }
+    } catch (err) {
+      setError('更新产品失败，请稍后重试');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 删除产品 (如果需要)
+  // const handleDeleteProduct = async (itemID: string) => { ... };
 
   // 关闭行
   const closeRow = (itemID: string) => {
@@ -218,6 +329,49 @@ export default function Home() {
   // 打印条形码
   
 
+  const renderProductForm = (handleSubmit: () => void, dialogTitle: string, submitButtonText: string) => (
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>{dialogTitle}</DialogTitle>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="itemID" className="text-right">
+            商品ID
+          </Label>
+          <Input id="itemID" name="itemID" value={formData.itemID} onChange={handleFormChange} className="col-span-3" disabled={dialogTitle.includes('编辑')} />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="upc" className="text-right">
+            UPC
+          </Label>
+          <Input id="upc" name="upc" value={formData.upc} onChange={handleFormChange} className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="name" className="text-right">
+            名称
+          </Label>
+          <Input id="name" name="name" value={formData.name} onChange={handleFormChange} className="col-span-3" />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="location" className="text-right">
+            库位
+          </Label>
+          <Input id="location" name="location" value={formData.location} onChange={handleFormChange} className="col-span-3" />
+        </div>
+      </div>
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      <DialogFooter>
+        <DialogClose asChild>
+            <Button type="button" variant="outline">取消</Button>
+        </DialogClose>
+        <Button type="button" onClick={handleSubmit} disabled={isLoading}>
+          {isLoading ? '处理中...' : submitButtonText}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+
   return (
     <div className="min-h-screen p-6 bg-gray-50">
       <header className="mb-8 text-center">
@@ -229,8 +383,11 @@ export default function Home() {
         {/* 批量查询区域 */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>批量查询</CardTitle>
-            <CardDescription>输入商品ID进行批量查询，多个ID请用逗号或空格分隔</CardDescription>
+            <CardTitle>商品管理</CardTitle>
+            <CardDescription>输入商品ID进行批量查询，或添加新商品。</CardDescription>
+            <div className="mt-4">
+              <Button onClick={openAddModal}>添加新商品</Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-4">
@@ -252,7 +409,20 @@ export default function Home() {
             </div>
           </CardContent>
           <CardFooter>
-            {error && (
+            {error && !isAddModalOpen && !isEditModalOpen && (
+              <Alert variant="destructive" className="w-full">
+                <AlertTitle>错误</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {successMessage && (
+              <Alert variant="default" className="w-full bg-green-100 border-green-400 text-green-700">
+                <AlertTitle>成功</AlertTitle>
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
+            
+            {duplicateInfo && duplicateInfo.hasDuplicates && (
               <Alert variant="destructive" className="w-full">
                 <AlertTitle>错误</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
@@ -316,7 +486,8 @@ export default function Home() {
                           />
                         </TableCell>
 
-                        <TableCell>
+                        <TableCell className="space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditModal(product)}>编辑</Button>
                           <Button 
                             variant="ghost"
                             size="sm"
@@ -335,6 +506,16 @@ export default function Home() {
           </Card>
         )}
       </main>
+
+      {/* 添加产品模态框 */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        {renderProductForm(handleAddProduct, "添加新商品", "添加")}
+      </Dialog>
+
+      {/* 编辑产品模态框 */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        {currentProduct && renderProductForm(handleEditProduct, `编辑商品: ${currentProduct.name}`, "保存更改")}
+      </Dialog>
     </div>
   );
 }
