@@ -67,7 +67,7 @@ export default function BarcodeGenerator() {
 
       // 生成条码
       JsBarcode(svg, inputValue, {
-        format: selectedType as any,
+        format: selectedType,
         width: 2,
         height: height,
         displayValue: showText,
